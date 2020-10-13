@@ -166,7 +166,7 @@ function arg_check(arg,check)
     end
 end
 --如果不是在路由器上运行，可以将路由器的MAC地址，纳入white list，则路由器信号不会纳入对比范围
-white_list={"50:BD:5F:6E:34:DC"}
+white_list={"00:00:00:00:00:00"}
 signal_24g_check=-50
 signal_5g_check=-60
 
