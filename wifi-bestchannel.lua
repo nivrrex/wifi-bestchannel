@@ -49,12 +49,21 @@ function table.match(tbl,value)
     end
     return false,nil
 end
+function get_current_channel(wlan)
+    local status = conn:call("iwinfo","info",{device=wlan})
+    if status ~= nil then
+        return status["channel"]
+    else 
+        return nil
+    end    
+end
 function find_best_channel_24g(ap,white_list,best_signal)
     local max_signal = -110
     local min_count = 0
     local min_channel = 0
     local count_channel = {0,0,0,0,0,0,0,0,0,0,0,0,0}
-    local main_channel = {1,6,11,13}
+    --local main_channel = {1,6,11,13}
+    local main_channel = {1,6,11}
     for bssid,value in pairs(ap) do
         if not table.match(white_list,bssid) then 
             --print(bssid,value["channel"],value["signal"],value["quality"],value["ssid"])
@@ -76,7 +85,6 @@ function find_best_channel_24g(ap,white_list,best_signal)
     count_channel[6] = count_channel[5] + count_channel[6] + count_channel[7]
     count_channel[11] = count_channel[10] + count_channel[11] + count_channel[12]
     count_channel[13] = count_channel[12] + count_channel[13]
-    --邻频干扰，纳入评测，可删除
     min_count = count_channel[1]
     min_channel = 1
     for _,v in pairs(main_channel) do
@@ -87,27 +95,140 @@ function find_best_channel_24g(ap,white_list,best_signal)
     end
     return min_channel
 end
-function get_current_channel(wlan)
-    local status = conn:call("iwinfo","info",{device=wlan})
-    if status ~= nil then
-        return status["channel"]
-    else 
-        return nil
-    end    
+function find_best_channel_5g(ap,white_list,best_signal)
+    local max_signal = -110
+    local min_count = 0
+    local min_channel = 0
+    local count_channel = {}
+    count_channel[36]=0
+    count_channel[40]=0
+    count_channel[44]=0
+    count_channel[48]=0
+    count_channel[149]=0
+    count_channel[153]=0
+    count_channel[157]=0
+    count_channel[161]=0
+    count_channel[165]=0
+    --local main_channel = {36,40,44,48,149,153,157,161,165}
+    local main_channel = {149,153,157,161,165}
+    for bssid,value in pairs(ap) do
+        if not table.match(white_list,bssid) then 
+            --print(bssid,value["channel"],value["signal"],value["quality"],value["ssid"])
+            if value["signal"] > max_signal then
+                max_signal = value["signal"]
+            end
+        else
+            --print(bssid,value["channel"],value["signal"],value["quality"],value["ssid"],"\t* White list *")
+        end
+    end
+    if max_signal < best_signal then max_signal = best_signal end
+    for bssid,value in pairs(ap) do
+        if value["signal"] <= max_signal and value["signal"] >= max_signal - 10 then
+            count_channel[value["channel"]] = count_channel[value["channel"]] + 1
+        end
+    end
+    min_count = count_channel[149]
+    min_channel = 149
+    for _,v in pairs(main_channel) do
+        if count_channel[v] < min_count then
+            min_count = count_channel[v]
+            min_channel = v
+        end
+    end
+    return min_channel
 end
 function switch_channel_24g(wlan,channel_num)
     local channel = {2412,2417,2422,2427,2432,2437,2442,2447,2452,2457,2462,2467,2472}
     local status = conn:call("hostapd." .. wlan,"switch_chan",{freq=channel[channel_num]})
     if status ~= nil then return true else return false end    
 end
+function switch_channel_5g(wlan,channel_num)
+    local channel ={}
+    channel[36]=5180
+    channel[40]=5200
+    channel[44]=5220
+    channel[48]=5240
+    channel[149]=5745
+    channel[153]=5765
+    channel[157]=5785
+    channel[161]=5805
+    channel[165]=5825
+    local status = conn:call("hostapd." .. wlan,"switch_chan",{freq=channel[channel_num]})
+    if status ~= nil then return true else return false end    
+end
+function arg_check(arg,check)
+    if arg == nil then 
+        return false 
+    else
+        if string.upper(arg) == string.upper(check) then
+            return true
+        end
+    end
+end
 --如果不是在路由器上运行，可以将路由器的MAC地址，纳入white list，则路由器信号不会纳入对比范围
-white_list={"00:00:00:00:00:00"}    
+white_list={"50:BD:5F:6E:34:DC"}
+signal_24g_check=-50
+signal_5g_check=-60
+
 ubus.start()
-wlan = "wlan0"
-get_current_channel(wlan)
-ap_signal = scan_channel_signal(wlan)
-min_channel = find_best_channel_24g(ap_signal,white_list,-50)
-last_channel = get_current_channel(wlan)
-switch_channel_24g(wlan,min_channel)
-print("[" .. os.date("%Y-%m-%d %H:%M:%S") .. "] Change channel ".. last_channel .." to " .. min_channel )
+--增加命令行参数，arg[1]是all,2.4g,5g等三种设置，决定scan的频段
+--arg[2]如果是true，则进行信道调整，否则不调整
+if arg[1] == nil then arg[1] = "ALL" end
+if arg_check(arg[1],"ALL") then 
+    wlan = "wlan0"
+    get_current_channel(wlan)
+    ap_signal = scan_channel_signal(wlan)
+    min_channel = find_best_channel_24g(ap_signal,white_list,signal_24g_check)
+    last_channel = get_current_channel(wlan)
+    if arg_check(arg[2],"TRUE") then
+        switch_channel_24g(wlan,min_channel)
+    end
+    if last_channel == min_channel then
+        print("[" .. os.date("%Y-%m-%d %H:%M:%S") .. "] [2.4G] Best channel is also ".. last_channel)
+    else
+        print("[" .. os.date("%Y-%m-%d %H:%M:%S") .. "] [2.4G] Change channel ".. last_channel .." to " .. min_channel )
+    end
+    
+    wlan = "wlan1"
+    get_current_channel(wlan)
+    ap_signal = scan_channel_signal(wlan)
+    min_channel = find_best_channel_5g(ap_signal,white_list,signal_5g_check)
+    last_channel = get_current_channel(wlan)
+    if arg_check(arg[2],"TRUE") then
+        switch_channel_5g(wlan,min_channel)
+    end
+    if last_channel == min_channel then
+        print("[" .. os.date("%Y-%m-%d %H:%M:%S") .. "] [ 5G ] Best channel is also ".. last_channel)
+    else
+        print("[" .. os.date("%Y-%m-%d %H:%M:%S") .. "] [ 5G ] Change channel ".. last_channel .." to " .. min_channel )
+    end
+elseif arg_check(arg[1],"2.4G") then 
+    wlan = "wlan0"
+    get_current_channel(wlan)
+    ap_signal = scan_channel_signal(wlan)
+    min_channel = find_best_channel_24g(ap_signal,white_list,signal_24g_check)
+    last_channel = get_current_channel(wlan)
+    if arg_check(arg[2],"TRUE") then
+        switch_channel_24g(wlan,min_channel)
+    end
+    if last_channel == min_channel then
+        print("[" .. os.date("%Y-%m-%d %H:%M:%S") .. "] [2.4G] Best channel is also ".. last_channel)
+    else
+        print("[" .. os.date("%Y-%m-%d %H:%M:%S") .. "] [2.4G] Change channel ".. last_channel .." to " .. min_channel )
+    end
+elseif arg_check(arg[1],"5G") then 
+    wlan = "wlan1"
+    get_current_channel(wlan)
+    ap_signal = scan_channel_signal(wlan)
+    min_channel = find_best_channel_5g(ap_signal,white_list,signal_5g_check)
+    last_channel = get_current_channel(wlan)
+    if arg_check(arg[2],"TRUE") then
+        switch_channel_5g(wlan,min_channel)
+    end
+    if last_channel == min_channel then
+        print("[" .. os.date("%Y-%m-%d %H:%M:%S") .. "] [ 5G ] Best channel is also ".. last_channel)
+    else
+        print("[" .. os.date("%Y-%m-%d %H:%M:%S") .. "] [ 5G ] Change channel ".. last_channel .." to " .. min_channel )
+    end
+end
 ubus.stop()
