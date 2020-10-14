@@ -139,8 +139,10 @@ function find_best_channel_5g(ap,white_list,best_signal)
 end
 function switch_channel_24g(wlan,channel_num)
     local channel = {2412,2417,2422,2427,2432,2437,2442,2447,2452,2457,2462,2467,2472}
-    local status = conn:call("hostapd." .. wlan,"switch_chan",{freq=channel[channel_num]})
-    if status ~= nil then return true else return false end    
+    --local status = conn:call("hostapd." .. wlan,"switch_chan",{freq=channel[channel_num]})
+    --if status ~= nil then return true else return false end
+    local status = os.execute("uci set wireless.radio0.channel=" .. channel_num .. " && uci commit wireless && wifi")
+    if status ~= 0 then return true else return false end    
 end
 function switch_channel_5g(wlan,channel_num)
     local channel ={}
@@ -153,8 +155,10 @@ function switch_channel_5g(wlan,channel_num)
     channel[157]=5785
     channel[161]=5805
     channel[165]=5825
-    local status = conn:call("hostapd." .. wlan,"switch_chan",{freq=channel[channel_num]})
-    if status ~= nil then return true else return false end    
+    --local status = conn:call("hostapd." .. wlan,"switch_chan",{freq=channel[channel_num]})
+    --if status ~= nil then return true else return false end    
+    local status = os.execute("uci set wireless.radio1.channel=" .. channel_num .. " && uci commit wireless && wifi")
+    if status ~= 0 then return true else return false end    
 end
 function arg_check(arg,check)
     if arg == nil then 
