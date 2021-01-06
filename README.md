@@ -20,6 +20,9 @@ OpenWrt下 2.4G/5G Wifi 最优信道选择，use lua and ubus
 2020-10-27:
 1. ubus 调用的 hostapd.wlan 的 switch_chan 方法，增加 bandwidth=20 和 ht=true 两个参数。该方法wifi中断时长较短，不介意带宽的可以使用。
 
+2021-01-06:
+1. 针对所有 2.4G 所有频点均纳入邻频干扰监测
+
 # 备注
 很简单的算法，效果尚可，可以放在 crontab 中定时执行
 
