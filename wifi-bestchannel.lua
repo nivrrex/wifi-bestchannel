@@ -57,15 +57,16 @@ function get_current_channel(wlan)
         return nil
     end    
 end
-function find_best_channel_24g(ap,white_list,best_signal)
+function find_best_channel_24g(ap,white_list,best_signal,interval_value)
     local max_signal = -110
     local min_count = 0
     local min_channel = 0
     local count_channel = {0,0,0,0,0,0,0,0,0,0,0,0,0}
-    --local main_channel = {1,6,11,13}
-    local main_channel = {1,6,11}
+    local count_channel_adjacent = {0,0,0,0,0,0,0,0,0,0,0,0,0}
+    --local main_channel = {1,6,11,13} --频点仅选择常用的1 6 11 13
+    local main_channel = {1,2,3,4,5,6,7,8,9,10,11,13}  --频点仅选择全部的
     for bssid,value in pairs(ap) do
-        if not table.match(white_list,bssid) then 
+        if not table.match(white_list,bssid) then
             --print(bssid,value["channel"],value["signal"],value["quality"],value["ssid"])
             if value["signal"] > max_signal then
                 max_signal = value["signal"]
@@ -76,20 +77,33 @@ function find_best_channel_24g(ap,white_list,best_signal)
     end
     if max_signal < best_signal then max_signal = best_signal end
     for bssid,value in pairs(ap) do
-        if value["signal"] <= max_signal and value["signal"] >= max_signal - 10 then
+        if value["signal"] <= max_signal and value["signal"] >= max_signal - interval_value then
             count_channel[value["channel"]] = count_channel[value["channel"]] + 1
         end
     end
-    --邻频干扰，纳入评测，可删除
-    count_channel[1] = count_channel[1] + count_channel[2]
-    count_channel[6] = count_channel[5] + count_channel[6] + count_channel[7]
-    count_channel[11] = count_channel[10] + count_channel[11] + count_channel[12]
-    count_channel[13] = count_channel[12] + count_channel[13]
-    min_count = count_channel[1]
+    --邻频干扰，纳入评测，针对常用的1 6 11 13等频点
+    --count_channel_adjacent[1] = count_channel[1] + count_channel[2]
+    --count_channel_adjacent[6] = count_channel[5] + count_channel[6] + count_channel[7]
+    --count_channel_adjacent[11] = count_channel[10] + count_channel[11] + count_channel[12]
+    --count_channel_adjacent[13] = count_channel[12] + count_channel[13]
+    --邻频干扰2，纳入评测，针对全部频点
+    count_channel_adjacent[1] = count_channel[1] + count_channel[2] + count_channel[3]
+    count_channel_adjacent[2] = count_channel[1] + count_channel[2] + count_channel[3] + count_channel[4]
+    count_channel_adjacent[3] = count_channel[1] + count_channel[2] + count_channel[3] + count_channel[4] + count_channel[5]
+    count_channel_adjacent[4] = count_channel[2] + count_channel[3] + count_channel[4] + count_channel[5] + count_channel[6]
+    count_channel_adjacent[5] = count_channel[3] + count_channel[4] + count_channel[5] + count_channel[6] + count_channel[7]
+    count_channel_adjacent[6] = count_channel[4] + count_channel[5] + count_channel[6] + count_channel[7] + count_channel[8]
+    count_channel_adjacent[7] = count_channel[5] + count_channel[6] + count_channel[7] + count_channel[8] + count_channel[9]
+    count_channel_adjacent[8] = count_channel[6] + count_channel[7] + count_channel[8] + count_channel[9] + count_channel[10]
+    count_channel_adjacent[9] = count_channel[7] + count_channel[8] + count_channel[9] + count_channel[10] + count_channel[11]
+    count_channel_adjacent[10] = count_channel[8] + count_channel[9] + count_channel[10] + count_channel[11]
+    count_channel_adjacent[11] = count_channel[9] + count_channel[10] + count_channel[11] + count_channel[13]
+    count_channel_adjacent[13] = count_channel[11] + count_channel[13]
+    min_count = count_channel_adjacent[1]
     min_channel = 1
     for _,v in pairs(main_channel) do
-        if count_channel[v] < min_count then
-            min_count = count_channel[v]
+        if count_channel_adjacent[v] < min_count then
+            min_count = count_channel_adjacent[v]
             min_channel = v
         end
     end
